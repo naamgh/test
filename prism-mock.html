@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prism Glow Test</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Big+Shoulders+Display:wght@900&family=Bowlby+One&family=Inter:wght@500;600&family=Rubik:wght@900&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#000; --panel:#1c1c1e; --fill:rgba(118,118,128,.24); --label2:rgba(235,235,245,.6); --tint:#0a84ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:#fff; font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",Inter,system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  .page { max-width:1100px; margin:auto; padding:28px 16px 60px; }
+  h1 { font-size:28px; margin:0 0 4px; letter-spacing:-.02em; }
+  .lede { color:var(--label2); font-size:14px; margin:0 0 18px; max-width:70ch; line-height:1.5; }
+  .stage { position:relative; border-radius:20px; overflow:hidden; background:#000; }
+  .stage.photo { background: radial-gradient(120% 70% at 30% 80%, #3d4a3a 0%, transparent 60%), radial-gradient(90% 60% at 80% 20%, #4c5868 0%, transparent 60%), linear-gradient(170deg,#28303a,#151a16 70%); }
+  .stage.check { background-color:#1d1d20; background-image:linear-gradient(45deg,#2a2a2e 25%,transparent 25%),linear-gradient(-45deg,#2a2a2e 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#2a2a2e 75%),linear-gradient(-45deg,transparent 75%,#2a2a2e 75%); background-size:20px 20px; background-position:0 0,0 10px,10px -10px,-10px 0; }
+  canvas { display:block; width:100%; height:auto; }
+  .ms { position:absolute; right:12px; bottom:10px; font-size:11px; color:var(--label2); font-variant-numeric:tabular-nums; }
+  .controls { display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:10px 18px; margin-top:16px; background:var(--panel); border-radius:18px; padding:16px; }
+  label.r { display:grid; grid-template-columns:86px 1fr 40px; align-items:center; gap:10px; font-size:14px; }
+  label.r span:last-child { text-align:right; color:var(--label2); font-variant-numeric:tabular-nums; }
+  input[type=range] { -webkit-appearance:none; appearance:none; height:4px; border-radius:2px; background:var(--fill); outline-offset:6px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:24px; height:24px; border-radius:50%; background:#fff; box-shadow:0 2px 6px rgba(0,0,0,.35); cursor:pointer; }
+  input[type=range]::-moz-range-thumb { width:24px; height:24px; border:0; border-radius:50%; background:#fff; cursor:pointer; }
+  .row2 { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-top:12px; }
+  .row2 input[type=text], .row2 select { font:inherit; font-size:15px; color:#fff; background:var(--fill); border:0; border-radius:10px; padding:9px 12px; }
+  .row2 input[type=text] { flex:1; min-width:160px; }
+  .seg { display:inline-grid; grid-auto-flow:column; background:var(--fill); border-radius:9px; padding:2px; }
+  .seg button { font:inherit; font-size:13px; font-weight:600; color:#fff; background:transparent; border:0; border-radius:7px; padding:7px 12px; cursor:pointer; }
+  .seg button.on { background:#636366; }
+  .btn { font:inherit; font-size:15px; font-weight:600; color:#fff; background:var(--tint); border:0; border-radius:12px; padding:10px 16px; cursor:pointer; }
+  .btn.grey { background:var(--fill); }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Prism glow</h1>
+  <p class="lede">A white core with rainbow fringes split along one direction (Direction 90 puts red on top), then broken into grain. Every slider redraws live. The output has a real transparent background, so it will work as an overlay; switch the backdrop to check.</p>
+
+  <div class="stage" id="stage"><canvas id="out" width="1400" height="560"></canvas><span class="ms" id="ms"></span></div>
+
+  <div class="row2">
+    <input type="text" id="txt" value="MESSY" aria-label="Text" maxlength="14">
+    <select id="font" aria-label="Font">
+      <option value="900 1px Rubik">Rubik Black</option>
+      <option value="1px Anton">Anton</option>
+      <option value="1px 'Archivo Black'">Archivo Black</option>
+      <option value="1px 'Bowlby One'">Bowlby One</option>
+      <option value="900 1px 'Big Shoulders Display'">Big Shoulders</option>
+    </select>
+    <span class="seg" id="bg"><button data-bg="black" class="on">Black</button><button data-bg="photo">Photo</button><button data-bg="check">Transparent</button></span>
+    <span class="seg" id="presets"><button data-p="poster" class="on">Poster</button><button data-p="subtle">Subtle</button><button data-p="wild">Wild</button></span>
+    <button class="btn grey" id="dl" type="button">Download PNG</button>
+  </div>
+
+  <div class="controls" id="controls"></div>
+</div>
+<script>
+  // ── Controls ─────────────────────────────────────────────────────────────
+  const SLIDERS = [
+    ['spread', 'Spread', 0, 80, 38],   // how far the colours separate
+    ['angle', 'Direction', 0, 360, 90],
+    ['blur', 'Blur', 0, 40, 11],
+    ['colour', 'Colour', 0, 150, 110],
+    ['core', 'White core', 0, 150, 100],
+    ['grain', 'Grain', 0, 100, 80],
+    ['size', 'Grain size', 1, 5, 2],
+    ['density', 'Clumping', 0, 100, 45]
+  ];
+  const PRESETS = {
+    poster: { spread: 38, angle: 90, blur: 11, colour: 110, core: 100, grain: 80, size: 2, density: 45 },
+    subtle: { spread: 12, angle: 90, blur: 7, colour: 60, core: 120, grain: 55, size: 1, density: 25 },
+    wild:   { spread: 58, angle: 115, blur: 13, colour: 130, core: 95, grain: 92, size: 3, density: 65 }
+  };
+  const V = {};
+  document.getElementById('controls').innerHTML = SLIDERS.map(([k, l, mn, mx, d]) => { V[k] = d; return `<label class="r"><span>${l}</span><input type="range" id="s-${k}" min="${mn}" max="${mx}" value="${d}"><span id="v-${k}">${d}</span></label>` }).join('');
+  SLIDERS.forEach(([k]) => document.getElementById('s-' + k).addEventListener('input', e => { V[k] = +e.target.value; document.getElementById('v-' + k).textContent = V[k]; clearPreset(); schedule(true) }));
+  SLIDERS.forEach(([k]) => document.getElementById('s-' + k).addEventListener('change', () => schedule(false)));
+  function clearPreset() { document.querySelectorAll('#presets button').forEach(b => b.classList.remove('on')) }
+  document.querySelectorAll('#presets button').forEach(b => b.onclick = () => { Object.assign(V, PRESETS[b.dataset.p]); SLIDERS.forEach(([k]) => { document.getElementById('s-' + k).value = V[k]; document.getElementById('v-' + k).textContent = V[k] }); document.querySelectorAll('#presets button').forEach(x => x.classList.toggle('on', x === b)); schedule() });
+  document.querySelectorAll('#bg button').forEach(b => b.onclick = () => { document.getElementById('stage').className = 'stage' + (b.dataset.bg === 'black' ? '' : ' ' + b.dataset.bg); document.querySelectorAll('#bg button').forEach(x => x.classList.toggle('on', x === b)) });
+  document.getElementById('txt').addEventListener('input', schedule);
+  document.getElementById('font').addEventListener('change', schedule);
+  document.getElementById('dl').onclick = () => { const a = document.createElement('a'); a.download = 'prism-glow.png'; a.href = document.getElementById('out').toDataURL('image/png'); a.click() };
+
+  // ── Effect ───────────────────────────────────────────────────────────────
+  const FW = 1400, FH = 560; let W = FW, H = FH, N = W * H, TMP = new Float32Array(N);
+  // Spectrum from one side of the split to the other (red/yellow lead, cyan/blue trail).
+  const HUES = [[1, .08, .06], [1, .45, 0], [1, .9, .1], [.35, 1, .45], [0, .85, 1], [.15, .35, 1], [.6, .2, 1]];
+
+  function boxSizes(sigma, n) {
+    const wl0 = Math.floor(Math.sqrt(12 * sigma * sigma / n + 1)), wl = wl0 % 2 ? wl0 : wl0 - 1, wu = wl + 2;
+    const m = Math.round((12 * sigma * sigma - n * wl * wl - 4 * n * wl - 3 * n) / (-4 * wl - 4));
+    return Array.from({ length: n }, (_, i) => ((i < m ? wl : wu) - 1) / 2);
+  }
+  function boxBlur(src, tmp, w, h, r) {
+    const k = 1 / (r + r + 1), cx = v => v < 0 ? 0 : v >= w ? w - 1 : v, cy = v => v < 0 ? 0 : v >= h ? h - 1 : v;
+    for (let y = 0; y < h; y++) { const row = y * w; let acc = src[row] * (r + 1); for (let i = 1; i <= r; i++) acc += src[row + cx(i)]; for (let x = 0; x < w; x++) { tmp[row + x] = acc * k; acc += src[row + cx(x + r + 1)] - src[row + cx(x - r)] } }
+    for (let x = 0; x < w; x++) { let acc = tmp[x] * (r + 1); for (let i = 1; i <= r; i++) acc += tmp[cy(i) * w + x]; for (let y = 0; y < h; y++) { src[y * w + x] = acc * k; acc += tmp[cy(y + r + 1) * w + x] - tmp[cy(y - r) * w + x] } }
+  }
+  function gauss(a, sigma) { if (sigma >= .6) boxSizes(sigma, 3).forEach(r => r >= 1 && boxBlur(a, TMP, W, H, Math.round(r))); return a }
+  function valueNoise(grid) {
+    const gw = Math.ceil(W / grid) + 2, gh = Math.ceil(H / grid) + 2, lat = new Float32Array(gw * gh).map(Math.random), out = new Float32Array(N), s = t => t * t * (3 - 2 * t);
+    for (let y = 0; y < H; y++) { const gy = y / grid, y0 = gy | 0, ty = s(gy - y0); for (let x = 0; x < W; x++) { const gx = x / grid, x0 = gx | 0, tx = s(gx - x0), i = y0 * gw + x0, a = lat[i] + (lat[i + 1] - lat[i]) * tx, b = lat[i + gw] + (lat[i + gw + 1] - lat[i + gw]) * tx; out[y * W + x] = a + (b - a) * ty } }
+    return out;
+  }
+
+  const textCv = document.createElement('canvas'); textCv.width = W; textCv.height = H;
+  async function draw(draft = false) {
+    const t0 = performance.now(), k = draft ? .5 : 1;
+    W = Math.round(FW * k); H = Math.round(FH * k); N = W * H; if (TMP.length !== N) TMP = new Float32Array(N);
+    textCv.width = W; textCv.height = H; const outCv = document.getElementById('out'); if (outCv.width !== W) { outCv.width = W; outCv.height = H }
+    const S = { spread: V.spread * k, blur: V.blur * k, size: Math.max(1, Math.round(V.size * k)) };
+    const text = document.getElementById('txt').value || ' ', fontSpec = document.getElementById('font').value;
+    const font = n => fontSpec.replace('1px', n + 'px');
+    await document.fonts.load(font(100), text);
+    // 1. Text mask, sized to ~78% of the width
+    const tc = textCv.getContext('2d'); tc.clearRect(0, 0, W, H); tc.font = font(100);
+    const m = tc.measureText(text), fs = Math.min(100 * W * .78 / m.width, H * .62 / ((m.actualBoundingBoxAscent || 72) / 100));
+    tc.font = font(fs); tc.textAlign = 'center'; tc.textBaseline = 'alphabetic'; tc.fillStyle = '#fff';
+    const asc = tc.measureText(text).actualBoundingBoxAscent || fs * .72;
+    tc.fillText(text, W / 2, H / 2 + asc / 2);
+    const px = tc.getImageData(0, 0, W, H).data, M = new Float32Array(N);
+    for (let i = 0; i < N; i++) M[i] = px[i * 4 + 3] / 255;
+
+    // 2. Spectral copies, each shifted along the direction and blurred a little more toward the edges
+    const R = new Float32Array(N), G = new Float32Array(N), B = new Float32Array(N);
+    // The core is worked out first so the colours can be kept mostly to the edges (letters stay readable).
+    const C = gauss(Float32Array.from(M), Math.max(.6, S.blur * .25)), kc = V.core / 100;
+    const ang = V.angle * Math.PI / 180, dx = Math.cos(ang), dy = -Math.sin(ang), cAmt = V.colour / 100 * .42;
+    HUES.forEach((hue, li) => {
+      const t = 1 - (li / (HUES.length - 1)) * 2, ox = Math.round(dx * S.spread * t), oy = Math.round(dy * S.spread * t);
+      const L = new Float32Array(N);
+      for (let y = 0; y < H; y++) { const sy = y - oy; if (sy < 0 || sy >= H) continue; for (let x = 0; x < W; x++) { const sx = x - ox; if (sx >= 0 && sx < W) L[y * W + x] = M[sy * W + sx] } }
+      gauss(L, S.blur * (.55 + .7 * Math.abs(t)));
+      for (let i = 0; i < N; i++) { const a = L[i] * cAmt * (1 - .82 * Math.min(1, C[i] * kc)); if (a > 0) { R[i] += hue[0] * a; G[i] += hue[1] * a; B[i] += hue[2] * a } }
+    });
+    // 3. White core
+    if (kc > 0) for (let i = 0; i < N; i++) { const a = C[i] * kc; R[i] += a; G[i] += a; B[i] += a }
+
+    // 4. Light → colour + alpha (so it composites over anything), then grain
+    const g = V.grain / 100, cell = S.size, cw = Math.ceil(W / cell), noise = new Float32Array(cw * Math.ceil(H / cell)).map(Math.random);
+    const dens = V.density > 0 ? valueNoise(40 * k) : null, dAmt = V.density / 100;
+    const out = new ImageData(W, H), o = out.data, A = new Float32Array(N), oR = new Float32Array(N), oG = new Float32Array(N), oB = new Float32Array(N);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, r = Math.min(1, R[i]), gg = Math.min(1, G[i]), b = Math.min(1, B[i]), a = Math.max(r, gg, b);
+      if (a < .003) continue;
+      let n = noise[((y / cell) | 0) * cw + ((x / cell) | 0)];
+      if (dens) n *= 1 + dAmt * (dens[i] - .5) * 1.6;                       // clumpy: grains thicker in some patches
+      const dither = a * 1.35 > n ? 1 : 0, alpha = a * (1 - g) + dither * g;
+      A[i] = alpha; oR[i] = r / a * alpha; oG[i] = gg / a * alpha; oB[i] = b / a * alpha;   // premultiplied
+    }
+    // 5. Very light soften so the sand isn't jaggy
+    if (g > 0) [oR, oG, oB, A].forEach(c => gauss(c, .7 * k));
+    for (let i = 0; i < N; i++) { const a = A[i]; if (a <= 0) continue; o[i * 4] = oR[i] / a * 255; o[i * 4 + 1] = oG[i] / a * 255; o[i * 4 + 2] = oB[i] / a * 255; o[i * 4 + 3] = Math.min(1, a) * 255 }
+    document.getElementById('out').getContext('2d').putImageData(out, 0, 0);
+    document.getElementById('ms').textContent = (draft ? 'preview ' : '') + Math.round(performance.now() - t0) + ' ms';
+  }
+  // While a slider is held: quick half-res drafts. On release (or any other change): full quality.
+  let timer = 0, busy = false, pending = null;
+  function schedule(draft = false) { clearTimeout(timer); timer = setTimeout(() => run(draft), draft ? 0 : 60) }
+  async function run(draft) { if (busy) { pending = pending === false ? false : draft; return } busy = true; await draw(draft); busy = false; if (pending !== null) { const p = pending; pending = null; run(p) } }
+  document.fonts.ready.then(schedule);
+</script>
+</body>
+</html>
